@@ -1,0 +1,6 @@
+apiVersion: thanos.orangesys.io/v1beta1
+kind: Receiver
+metadata:
+  name: receiver-sample
+spec:
+  storage: 3Gi

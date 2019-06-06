@@ -1,0 +1,3 @@
+version: "2"
+domain: orangesys.io
+repo: github.com/orangesys/thanos-operator
