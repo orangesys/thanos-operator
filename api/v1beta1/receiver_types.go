@@ -29,6 +29,8 @@ import (
 type ReceiverSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	Image *string `json:"image"`
+
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 

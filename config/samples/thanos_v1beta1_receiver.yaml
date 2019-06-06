@@ -3,4 +3,5 @@ kind: Receiver
 metadata:
   name: receiver-sample
 spec:
+  image: "improbable/thanos:v0.5.0"
   storage: 3Gi

@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	thanosv1beta1 "github.com/orangesys/thanos-operator/api/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,13 +28,18 @@ import (
 // object: Thanos instance
 // replicas: the number of replicas for the Thanos instance
 // storage: the size of the storage for the Thanos instance (e.g. 2Gi)
-func SetStatefulSetFields(ss *appsv1.StatefulSet, service *corev1.Service, thanos metav1.Object, storage *string) {
+func SetStatefulSetFields(
+	ss *appsv1.StatefulSet,
+	service *corev1.Service,
+	thanos metav1.Object,
+	t *thanosv1beta1.Receiver,
+) {
 	gracePeriodTerm := int64(10)
 	replicas := int32(1)
 
-	if storage == nil {
+	if t.Spec.Storage == nil {
 		s := "2Gi"
-		storage = &s
+		t.Spec.Storage = &s
 	}
 
 	copyLabels := thanos.GetLabels()
@@ -48,7 +54,7 @@ func SetStatefulSetFields(ss *appsv1.StatefulSet, service *corev1.Service, thano
 	labels["receiver-statefuleset"] = thanos.GetName()
 
 	rl := corev1.ResourceList{}
-	rl["storage"] = resource.MustParse(*storage)
+	rl["storage"] = resource.MustParse(*t.Spec.Storage)
 
 	ss.Labels = labels
 	ss.Spec.Selector = &metav1.LabelSelector{
@@ -66,7 +72,7 @@ func SetStatefulSetFields(ss *appsv1.StatefulSet, service *corev1.Service, thano
 			Containers: []corev1.Container{
 				{
 					Name:  "thanos",
-					Image: "improbable/thanos:v0.5.0",
+					Image: *t.Spec.Image,
 					Args:  []string{"receive", "--log.level=debug", "--tsdb.path=/thanos-receive", "--tsdb.retention=3h", "--labels=receive=\"true\""},
 					Ports: []corev1.ContainerPort{
 						{

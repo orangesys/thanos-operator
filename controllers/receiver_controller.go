@@ -95,7 +95,12 @@ func (r *ReceiverReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	_, err = ctrl.CreateOrUpdate(ctx, r.Client, ss, func() error {
-		util.SetStatefulSetFields(ss, service, receiver, receiver.Spec.Storage)
+		util.SetStatefulSetFields(
+			ss,
+			service,
+			receiver,
+			receiver,
+		)
 		return controllerutil.SetControllerReference(receiver, ss, r.Scheme)
 	})
 
