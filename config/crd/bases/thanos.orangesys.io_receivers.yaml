@@ -390,9 +390,11 @@ spec:
           type: object
         spec:
           properties:
-            resources:
+            image:
               description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
                 Important: Run "make" to regenerate code after modifying this file'
+              type: string
+            resources:
               properties:
                 limits:
                   additionalProperties:
