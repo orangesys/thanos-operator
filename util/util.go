@@ -24,6 +24,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	governingServiceName = "thanos-"
+	DefaultThanosVersion = "v0.5.0"
+	defaultRetetion      = "24h"
+)
+
 // SetStatefulSetFields sets fields on a appsv1.StatefulSet pointer generated for the Thanos instance
 // object: Thanos instance
 // replicas: the number of replicas for the Thanos instance
@@ -31,7 +37,6 @@ import (
 func SetStatefulSetFields(
 	ss *appsv1.StatefulSet,
 	service *corev1.Service,
-	thanos metav1.Object,
 	t *thanosv1beta1.Receiver,
 ) {
 	gracePeriodTerm := int64(10)
@@ -42,23 +47,29 @@ func SetStatefulSetFields(
 		t.Spec.Storage = &s
 	}
 
-	copyLabels := thanos.GetLabels()
-	if copyLabels == nil {
-		copyLabels = map[string]string{}
+	podAnnotations := map[string]string{}
+	podLabels := map[string]string{}
+	if t.Spec.PodMetadata != nil {
+		if t.Spec.PodMetadata.Labels != nil {
+			for k, v := range t.Spec.PodMetadata.Labels {
+				podLabels[k] = v
+			}
+		}
+		if t.Spec.PodMetadata.Annotations != nil {
+			for k, v := range t.Spec.PodMetadata.Annotations {
+				podAnnotations[k] = v
+			}
+		}
 	}
 
-	labels := map[string]string{}
-	for k, v := range copyLabels {
-		labels[k] = v
-	}
-	labels["receiver-statefuleset"] = thanos.GetName()
+	podLabels["app"] = "receiver"
+	podLabels["thanos"] = t.Name
 
 	rl := corev1.ResourceList{}
 	rl["storage"] = resource.MustParse(*t.Spec.Storage)
 
-	ss.Labels = labels
 	ss.Spec.Selector = &metav1.LabelSelector{
-		MatchLabels: map[string]string{"receiver-statefulset": thanos.GetName()},
+		MatchLabels: podLabels,
 	}
 	ss.Spec.ServiceName = service.Name
 	ss.Spec.Replicas = &replicas
@@ -174,8 +185,6 @@ func SetServiceFields(service *corev1.Service, thanos metav1.Object) {
 			Port: 10901,
 			Name: "grpc",
 		},
-		// {Port: 19291, TargetPort: intstr.IntOrString{IntVal: 19291, Type: intstr.Int}},
-		// {Port: 10901, TargetPort: intstr.IntOrString{IntVal: 10901, Type: intstr.Int}},
 	}
-	service.Spec.Selector = map[string]string{"receiver-statefulset": thanos.GetName()}
+	service.Spec.Selector = map[string]string{"thanos": thanos.GetName()}
 }

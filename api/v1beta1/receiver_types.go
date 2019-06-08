@@ -29,6 +29,16 @@ import (
 type ReceiverSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Standard object’s metadata. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md
+	// Metadata Labels and Annotations gets propagated to the prometheus pods.
+	PodMetadata *metav1.ObjectMeta `json:"podMetadata,omitempty"`
+
+	// Image if specified has precedence over baseImage, tag and sha
+	// combinations. Specifying the version is still necessary to ensure the
+	// Prometheus Operator knows what version of Prometheus is being
+	// configured.
 	Image *string `json:"image,omitempty"`
 
 	// +optional

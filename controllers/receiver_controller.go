@@ -99,7 +99,6 @@ func (r *ReceiverReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			ss,
 			service,
 			receiver,
-			receiver,
 		)
 		return controllerutil.SetControllerReference(receiver, ss, r.Scheme)
 	})
