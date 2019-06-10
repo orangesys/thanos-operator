@@ -47,11 +47,6 @@ var (
 	}
 
 	probeTimeoutSeconds int32 = 3
-	// rolesMatrix               = []string{
-	// 	"receive",
-	// 	"store",
-	// 	"query",
-	// }
 )
 
 // SetStatefulSetService set filds on a appsv1.StatefulSet pointer generated and
@@ -194,54 +189,14 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 	}, nil
 }
 
-// MakeStatefulSetService make fields on the service object
-// func MakeStatefulSetService(t *thanosv1beta1.Receiver) *corev1.Service {
-// 	svc := &corev1.Service{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: governingServiceName,
-// 			OwnerReferences: []metav1.OwnerReference{
-// 				metav1.OwnerReference{
-// 					Name:       t.GetName(),
-// 					Kind:       t.Kind,
-// 					APIVersion: t.APIVersion,
-// 					UID:        t.GetUID(),
-// 				},
-// 			},
-// 			Labels: map[string]string{
-// 				"thanos": t.GetName(),
-// 			},
-// 		},
-// 		Spec: corev1.ServiceSpec{
-// 			ClusterIP: "None",
-// 			Ports: []corev1.ServicePort{
-// 				{
-// 					Port: 19291,
-// 					Name: "receive",
-// 				},
-// 				{
-// 					Port: 10901,
-// 					Name: "grpc",
-// 				},
-// 			},
-// 			Selector: map[string]string{
-// 				"app": "receiver",
-// 			},
-// 		},
-// 	}
-// 	return svc
-// }
-
 // SetServiceFields sets fields on the Service object
-func SetService(service *corev1.Service, thanos metav1.Object) {
-	copyLabels := thanos.GetLabels()
-	if copyLabels == nil {
-		copyLabels = map[string]string{}
+func SetService(service *corev1.Service, t thanosv1beta1.Receiver) {
+	t = *t.DeepCopy()
+
+	service.Labels = map[string]string{
+		"service": "receiver",
+		"thanos":  t.Name,
 	}
-	labels := map[string]string{}
-	for k, v := range copyLabels {
-		labels[k] = v
-	}
-	service.Labels = labels
 
 	service.Spec.Ports = []corev1.ServicePort{
 		{
@@ -257,5 +212,5 @@ func SetService(service *corev1.Service, thanos metav1.Object) {
 			Name: "grpc",
 		},
 	}
-	service.Spec.Selector = map[string]string{"thanos": thanos.GetName()}
+	service.Spec.Selector = map[string]string{"thanos": t.Name}
 }
