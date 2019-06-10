@@ -45,13 +45,6 @@ type ReceiverReconciler struct {
 	Scheme   *runtime.Scheme
 }
 
-func ignoreNotFound(err error) error {
-	if errors.IsNotFound(err) {
-		return nil
-	}
-	return err
-}
-
 // +kubebuilder:rbac:groups=thanos.orangesys.io,resources=receivers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=thanos.orangesys.io,resources=receivers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
@@ -74,12 +67,12 @@ func (r *ReceiverReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Generate Service
 	service := &corev1.Service{
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      req.Name + "-receiver-service",
+			Name:      req.Name,
 			Namespace: req.Namespace,
 		},
 	}
 	_, err := ctrl.CreateOrUpdate(ctx, r.Client, service, func() error {
-		util.SetServiceFields(service, receiver)
+		util.SetService(service, receiver)
 		return controllerutil.SetControllerReference(receiver, service, r.Scheme)
 	})
 	if err != nil {
@@ -89,16 +82,16 @@ func (r *ReceiverReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Generate StatefulSet
 	ss := &appsv1.StatefulSet{
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:      req.Name + "-receiver-statefulset",
+			Name:      req.Name,
 			Namespace: req.Namespace,
 		},
 	}
 
 	_, err = ctrl.CreateOrUpdate(ctx, r.Client, ss, func() error {
-		util.SetStatefulSetFields(
+		util.SetStatefulSet(
 			ss,
 			service,
-			receiver,
+			*receiver,
 		)
 		return controllerutil.SetControllerReference(receiver, ss, r.Scheme)
 	})
@@ -138,4 +131,11 @@ func (r *ReceiverReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.StatefulSet{}). // Generates StatefulSets
 		Owns(&corev1.Service{}).     // Generates Services
 		Complete(r)
+}
+
+func ignoreNotFound(err error) error {
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }

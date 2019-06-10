@@ -17,6 +17,9 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"strings"
+
 	thanosv1beta1 "github.com/orangesys/thanos-operator/api/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -25,30 +28,93 @@ import (
 )
 
 const (
-	governingServiceName = "thanos-"
-	DefaultThanosVersion = "v0.5.0"
+	governingServiceName = "thanos"
+	defaultThanosVersion = "v0.5.0"
 	defaultRetetion      = "24h"
+	receiveStorage       = "2Gi"
+	receiverDir          = "/thanos-receive"
+	secretsDir           = "/etc/thanos/secrets/"
+	sSetInputHashName    = "prometheus-operator-input-hash"
 )
+
+var (
+	miniReplicas                int32 = 1
+	gracePeriodTerm             int64 = 10
+	managedByOperatorLabel            = "managed-by"
+	managedByOperatorLabelValue       = "thanos-operator"
+	managedByOperatorLabels           = map[string]string{
+		managedByOperatorLabel: managedByOperatorLabelValue,
+	}
+
+	probeTimeoutSeconds int32 = 3
+	// rolesMatrix               = []string{
+	// 	"receive",
+	// 	"store",
+	// 	"query",
+	// }
+)
+
+// SetStatefulSetService set filds on a appsv1.StatefulSet pointer generated and
+// the Service object for the Thanos instance
 
 // SetStatefulSetFields sets fields on a appsv1.StatefulSet pointer generated for the Thanos instance
 // object: Thanos instance
 // replicas: the number of replicas for the Thanos instance
 // storage: the size of the storage for the Thanos instance (e.g. 2Gi)
-func SetStatefulSetFields(
+func SetStatefulSet(
 	ss *appsv1.StatefulSet,
 	service *corev1.Service,
-	t *thanosv1beta1.Receiver,
+	t thanosv1beta1.Receiver,
 ) {
-	gracePeriodTerm := int64(10)
-	replicas := int32(1)
+	t = *t.DeepCopy()
 
-	if t.Spec.Storage == nil {
-		s := "2Gi"
-		t.Spec.Storage = &s
+	podLabels := map[string]string{}
+	rl := corev1.ResourceList{}
+
+	switch {
+	case strings.HasPrefix(t.Name, "receiver"):
+		if t.Spec.Storage == "" {
+			t.Spec.Storage = receiveStorage
+		}
+		if t.Spec.Retention == "" {
+			t.Spec.Retention = defaultRetetion
+		}
+		podLabels["app"] = "receiver"
+		podLabels["thanos"] = t.Name
+
+		rl["storage"] = resource.MustParse(t.Spec.Storage)
+
+		ss.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "thanos-persistent-storage"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+					Resources: corev1.ResourceRequirements{
+						Requests: rl,
+					},
+				},
+			},
+		}
+	}
+
+	if t.Spec.Resources.Requests == nil {
+		t.Spec.Resources.Requests = corev1.ResourceList{}
+	}
+
+	_, memoryRequestFound := t.Spec.Resources.Requests[corev1.ResourceMemory]
+	memoryLimit, memoryLimitFound := t.Spec.Resources.Limits[corev1.ResourceMemory]
+	if !memoryRequestFound {
+		defaultMemoryRequest := resource.MustParse("1Gi")
+		compareResult := memoryLimit.Cmp(defaultMemoryRequest)
+		if memoryLimitFound && compareResult <= 0 {
+			t.Spec.Resources.Requests[corev1.ResourceMemory] = memoryLimit
+		} else {
+			t.Spec.Resources.Requests[corev1.ResourceMemory] = defaultMemoryRequest
+		}
 	}
 
 	podAnnotations := map[string]string{}
-	podLabels := map[string]string{}
+
 	if t.Spec.PodMetadata != nil {
 		if t.Spec.PodMetadata.Labels != nil {
 			for k, v := range t.Spec.PodMetadata.Labels {
@@ -62,110 +128,111 @@ func SetStatefulSetFields(
 		}
 	}
 
-	podLabels["app"] = "receiver"
-	podLabels["thanos"] = t.Name
-
-	rl := corev1.ResourceList{}
-	rl["storage"] = resource.MustParse(*t.Spec.Storage)
-
 	ss.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: podLabels,
 	}
 	ss.Spec.ServiceName = service.Name
-	ss.Spec.Replicas = &replicas
+	ss.Spec.Replicas = &miniReplicas
+
+	podspec, err := makePodSpec(t)
+	if err != nil {
+		return
+	}
+
 	ss.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: ss.Spec.Selector.MatchLabels,
 		},
+		Spec: *podspec,
+	}
 
-		Spec: corev1.PodSpec{
-			TerminationGracePeriodSeconds: &gracePeriodTerm,
-			Containers: []corev1.Container{
-				{
-					Name:  "thanos",
-					Image: *t.Spec.Image,
-					Args:  []string{"receive", "--log.level=debug", "--tsdb.path=/thanos-receive", "--tsdb.retention=3h", "--labels=receive=\"true\""},
-					Ports: []corev1.ContainerPort{
-						{
-							ContainerPort: 19291,
-							Name:          "receive",
-						},
-						{
-							ContainerPort: 10901,
-							Name:          "grpc",
-						},
-					},
-					VolumeMounts: []corev1.VolumeMount{{Name: "thanos-persistent-storage", MountPath: "/thanos-receive"}},
-				},
-			},
-		},
-	}
-	ss.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "thanos-persistent-storage"},
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes: []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-				Resources: corev1.ResourceRequirements{
-					Requests: rl,
-				},
-			},
-		},
-	}
 }
 
-// DeploymentFields set field on the thanos object
-// func DeploymentFields(dm *appsv1.Deployment, service *corev1.Service, thanos metav1.Object, cont corev1.Container, storage *string) {
-// 	gracePeriodTerm := int64(10)
-// 	replicas := int32(1)
+// makePodSpec  is create spec
+func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
+	thanosArgs := []string{
+		"receive",
+		fmt.Sprintf("--tsdb.path=%s", t.Spec.ReceivePrefix),
+		fmt.Sprintf("--tsdb.retention=%s", t.Spec.Retention),
+		fmt.Sprintf("--labels=receive=\"%s\"", t.Spec.ReceiveLables),
+	}
+	if t.Spec.LogLevel != "" && t.Spec.LogLevel != "info" {
+		thanosArgs = append(thanosArgs, fmt.Sprintf("--log.level=%s", t.Spec.LogLevel))
+	}
 
-// 	if storage == nil {
-// 		s := "2Gi"
-// 		storage = &s
-// 	}
+	containers := []corev1.Container{
+		{
+			Name:  "thanos",
+			Image: *t.Spec.Image,
+			Args:  thanosArgs,
+			Ports: []corev1.ContainerPort{
+				{
+					ContainerPort: 19291,
+					Name:          "receive",
+				},
+				{
+					ContainerPort: 10902,
+					Name:          "http",
+				},
+				{
+					ContainerPort: 10901,
+					Name:          "grpc",
+				},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "thanos-persistent-storage",
+					MountPath: "/thanos-receive",
+				},
+			},
+		},
+	}
 
-// 	copyLabels := thanos.GetLabels()
-// 	if copyLabels == nil {
-// 		copyLabels = map[string]string{}
-// 	}
+	return &corev1.PodSpec{
+		TerminationGracePeriodSeconds: &gracePeriodTerm,
+		Containers:                    containers,
+	}, nil
+}
 
-// 	labels := map[string]string{}
-// 	for k, v := range copyLabels {
-// 		labels[k] = v
-// 	}
-
-// 	labels["receiver-deployment"] = thanos.GetName()
-
-// 	rl := corev1.ResourceList{}
-// 	rl["storage"] = resource.MustParse(*storage)
-
-// 	dm.Labels = labels
-// 	dm.Spec.Selector = &metav1.LabelSelector{
-// 		MatchLabels: map[string]string{"receiver-deployment": thanos.GetName()},
-// 	}
-
-// 	dm.Spec.Replicas = &replicas
-// 	dm.Spec.Template = corev1.PodTemplateSpec{
+// MakeStatefulSetService make fields on the service object
+// func MakeStatefulSetService(t *thanosv1beta1.Receiver) *corev1.Service {
+// 	svc := &corev1.Service{
 // 		ObjectMeta: metav1.ObjectMeta{
-// 			Labels: dm.Spec.Selector.MatchLabels,
-// 		},
-
-// 		Spec: corev1.PodSpec{
-// 			TerminationGracePeriodSeconds: &gracePeriodTerm,
-// 			Containers: []corev1.Container{
-// 				{
-// 					Name:         "thanos",
-// 					Image:        "improbable/thanos:v0.5.0-rc.0",
-// 					Args:         []string{"receive", "--log.level=debug", "--tsdb.path=/thanos-receive", "--tsdb.retention=3h", "--labels=receive=\"true\""},
-// 					Ports:        []corev1.ContainerPort{{ContainerPort: 19291}},
-// 					VolumeMounts: []corev1.VolumeMount{{Name: "receiver-persistent-storage", MountPath: "/thanos-receive"}},
+// 			Name: governingServiceName,
+// 			OwnerReferences: []metav1.OwnerReference{
+// 				metav1.OwnerReference{
+// 					Name:       t.GetName(),
+// 					Kind:       t.Kind,
+// 					APIVersion: t.APIVersion,
+// 					UID:        t.GetUID(),
 // 				},
+// 			},
+// 			Labels: map[string]string{
+// 				"thanos": t.GetName(),
+// 			},
+// 		},
+// 		Spec: corev1.ServiceSpec{
+// 			ClusterIP: "None",
+// 			Ports: []corev1.ServicePort{
+// 				{
+// 					Port: 19291,
+// 					Name: "receive",
+// 				},
+// 				{
+// 					Port: 10901,
+// 					Name: "grpc",
+// 				},
+// 			},
+// 			Selector: map[string]string{
+// 				"app": "receiver",
 // 			},
 // 		},
 // 	}
+// 	return svc
 // }
 
 // SetServiceFields sets fields on the Service object
-func SetServiceFields(service *corev1.Service, thanos metav1.Object) {
+func SetService(service *corev1.Service, thanos metav1.Object) {
 	copyLabels := thanos.GetLabels()
 	if copyLabels == nil {
 		copyLabels = map[string]string{}
@@ -180,6 +247,10 @@ func SetServiceFields(service *corev1.Service, thanos metav1.Object) {
 		{
 			Port: 19291,
 			Name: "receive",
+		},
+		{
+			Port: 10902,
+			Name: "http",
 		},
 		{
 			Port: 10901,

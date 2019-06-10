@@ -34,18 +34,70 @@ type ReceiverSpec struct {
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md
 	// Metadata Labels and Annotations gets propagated to the prometheus pods.
 	PodMetadata *metav1.ObjectMeta `json:"podMetadata,omitempty"`
+	// ServiceMonitors to be selected for target discovery.
+	ServiceMonitorSelector *metav1.LabelSelector `json:"serviceMonitorSelector,omitempty"`
+	// Namespaces to be selected for ServiceMonitor discovery. If nil, only
+	// check own namespace.
+	ServiceMonitorNamespaceSelector *metav1.LabelSelector `json:"serviceMonitorNamespaceSelector,omitempty"`
+
+	// Number of instances to deploy for a Prometheus deployment.
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Version of Prometheus to be deployed.
+	Version string `json:"version,omitempty"`
+	// Tag of Prometheus container image to be deployed. Defaults to the value of `version`.
+	// Version is ignored if Tag is set.
+	Tag string `json:"tag,omitempty"`
+
+	// If specified, the pod's scheduling constraints.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
 	// Image if specified has precedence over baseImage, tag and sha
 	// combinations. Specifying the version is still necessary to ensure the
 	// Prometheus Operator knows what version of Prometheus is being
 	// configured.
 	Image *string `json:"image,omitempty"`
+	// Base image to use for a Prometheus deployment.
 
-	// +optional
+	BaseImage string `json:"baseImage,omitempty"`
+
+	// Define resources requests and limits for single Pods.
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// +optional
-	Storage *string `json:"storage,omitempty"`
+	// Time duration Prometheus shall retain data for. Default is '24h',
+	// and must match the regular expression `[0-9]+(ms|s|m|h|d|w|y)` (milliseconds seconds minutes hours days weeks years).
+	Retention string `json:"retention,omitempty"`
+
+	// The recieve prefix storage with tsdb
+	ReceivePrefix string `json:"receivePrefix,omitempty"`
+
+	// Log level for Prometheus to be configured with.
+	LogLevel string `json:"logLevel,omitempty"`
+
+	// the receiver labels to set with receiver config
+	ReceiveLables string `json:"receiveLabels,omitempty"`
+
+	// The labels to add to any time series or alerts when communicating with
+	// external systems (federation, remote storage, Alertmanager).
+	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
+
+	// Storage spec to specify how storage shall be used.
+	Storage string `json:"storage,omitempty"`
+
+	// Define which Nodes the Pods are scheduled on.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Secrets is a list of Secrets in the same namespace as the Prometheus
+	// object, which shall be mounted into the Prometheus Pods.
+	// The Secrets are mounted into /etc/prometheus/secrets/<secret-name>.
+	Secrets []string `json:"secrets,omitempty"`
+
+	// containers is entirely outside the scope of what the maintainers will support and by doing
+	// so, you accept that this behaviour may break at any time without notice.
+	Containers []corev1.Container `json:"containers,omitempty"`
+
+	// ObjectStorageConfig configures object storage in Thanos.
+	ObjectStorageConfig *corev1.SecretKeySelector `json:"objectStorageConfig,omitempty"`
 }
 
 // ReceiverStatus defines the observed state of Receiver
@@ -61,6 +113,15 @@ type ReceiverStatus struct {
 
 	// serviceStatus contains the status of the Service managed by thanos reciver
 	ServiceStatus corev1.ServiceStatus `json:"serviceStatus,omitempty"`
+
+	// Total number of non-terminated pods targeted by this Prometheus deployment
+	// that have the desired version spec.
+	UpdatedReplicas int32 `json:"updatedReplicas"`
+	// Total number of available pods (ready for at least minReadySeconds)
+	// targeted by this Prometheus deployment.
+	AvailableReplicas int32 `json:"availableReplicas"`
+	// Total number of unavailable pods targeted by this Prometheus deployment.
+	UnavailableReplicas int32 `json:"unavailableReplicas"`
 }
 
 // +kubebuilder:printcolumn:name="storage",type="string",JSONPath=".spec.storage",format="byte"
