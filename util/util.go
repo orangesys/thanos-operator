@@ -154,30 +154,58 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 	if t.Spec.LogLevel != "" && t.Spec.LogLevel != "info" {
 		thanosArgs = append(thanosArgs, fmt.Sprintf("--log.level=%s", t.Spec.LogLevel))
 	}
+	env := []corev1.EnvVar{
+		{
+			Name:  "GOOGLE_APPLICATION_CREDENTIALS",
+			Value: "/var/thanos/secrets/secret.json",
+		},
+	}
+
+	ports := []corev1.ContainerPort{
+		{
+			ContainerPort: 10902,
+			Name:          "http",
+		},
+		{
+			ContainerPort: 10901,
+			Name:          "grpc",
+		},
+	}
+
+	if strings.HasPrefix(t.Name, "receiver") {
+		ports = append(ports, corev1.ContainerPort{
+			ContainerPort: 19291,
+			Name:          "receive",
+		})
+	}
+
+	volumemounts := []corev1.VolumeMount{
+		{
+			Name:      "thanos-persistent-storage",
+			MountPath: "/thanos-receive",
+		},
+		{
+			Name:      "google-cloud-key",
+			MountPath: "/var/thanos/secrets/",
+		},
+	}
 
 	containers := []corev1.Container{
 		{
-			Name:  "thanos",
-			Image: *t.Spec.Image,
-			Args:  thanosArgs,
-			Ports: []corev1.ContainerPort{
-				{
-					ContainerPort: 19291,
-					Name:          "receive",
-				},
-				{
-					ContainerPort: 10902,
-					Name:          "http",
-				},
-				{
-					ContainerPort: 10901,
-					Name:          "grpc",
-				},
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "thanos-persistent-storage",
-					MountPath: "/thanos-receive",
+			Name:         "thanos",
+			Image:        *t.Spec.Image,
+			Args:         thanosArgs,
+			Env:          env,
+			Ports:        ports,
+			VolumeMounts: volumemounts,
+		},
+	}
+	volumes := []corev1.Volume{
+		{
+			Name: "google-cloud-key",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "google-cloud-key",
 				},
 			},
 		},
@@ -186,6 +214,7 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 	return &corev1.PodSpec{
 		TerminationGracePeriodSeconds: &gracePeriodTerm,
 		Containers:                    containers,
+		Volumes:                       volumes,
 	}, nil
 }
 
