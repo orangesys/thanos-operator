@@ -73,6 +73,7 @@ func SetStatefulSet(
 		}
 		podLabels["app"] = "receiver"
 		podLabels["thanos"] = t.Name
+		podLabels["thanos-store-api"] = "true"
 
 		rl["storage"] = resource.MustParse(t.Spec.Storage)
 
