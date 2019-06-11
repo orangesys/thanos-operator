@@ -5,3 +5,9 @@ metadata:
 spec:
   image: "improbable/thanos:v0.5.0"
   storage: 3Gi
+  retention: "3h"
+  receivePrefix: "/thanos-receive"
+  receiveLabels: "demo"
+  bucketName: "orangesys-thanos-demo"
+  objstoreType: "GCS"
+  secretName: "thanos-demo-gcs"

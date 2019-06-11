@@ -71,9 +71,6 @@ func SetStatefulSet(
 		if t.Spec.Storage == "" {
 			t.Spec.Storage = receiveStorage
 		}
-		if t.Spec.Retention == "" {
-			t.Spec.Retention = defaultRetetion
-		}
 		podLabels["app"] = "receiver"
 		podLabels["thanos"] = t.Name
 
@@ -145,11 +142,20 @@ func SetStatefulSet(
 
 // makePodSpec  is create spec
 func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
+
+	if t.Spec.ReceivePrefix == "" {
+		t.Spec.ReceivePrefix = receiverDir
+	}
+	if t.Spec.Retention == "" {
+		t.Spec.Retention = defaultRetetion
+	}
+	// TODO set args to spec
 	thanosArgs := []string{
 		"receive",
 		fmt.Sprintf("--tsdb.path=%s", t.Spec.ReceivePrefix),
 		fmt.Sprintf("--tsdb.retention=%s", t.Spec.Retention),
 		fmt.Sprintf("--labels=receive=\"%s\"", t.Spec.ReceiveLables),
+		fmt.Sprintf("--objstore.config=type: %s\nconfig:\n  bucket: \"%s\"", t.Spec.ObjectStorageType, t.Spec.BucketName),
 	}
 	if t.Spec.LogLevel != "" && t.Spec.LogLevel != "info" {
 		thanosArgs = append(thanosArgs, fmt.Sprintf("--log.level=%s", t.Spec.LogLevel))
@@ -157,7 +163,7 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 	env := []corev1.EnvVar{
 		{
 			Name:  "GOOGLE_APPLICATION_CREDENTIALS",
-			Value: "/var/thanos/secrets/secret.json",
+			Value: secretsDir + t.Spec.SecretName + ".json",
 		},
 	}
 
@@ -179,14 +185,15 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 		})
 	}
 
+	// mount to pod
 	volumemounts := []corev1.VolumeMount{
 		{
 			Name:      "thanos-persistent-storage",
-			MountPath: "/thanos-receive",
+			MountPath: t.Spec.Retention,
 		},
 		{
 			Name:      "google-cloud-key",
-			MountPath: "/var/thanos/secrets/",
+			MountPath: secretsDir,
 		},
 	}
 
@@ -200,12 +207,18 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 			VolumeMounts: volumemounts,
 		},
 	}
+
+	// Need create json from gcp iam
+	// https://github.com/orangesys/blueprint/tree/master/prometheus-thanos
+	// kubectl create secret generic ${SERVICE_ACCOUNT_NAME} --from-file=${SERVICE_ACCOUNT_NAME}.json=${SERVICE_ACCOUNT_NAME}.json
+	// secret name is thanos-demo-gcs
+	// TODO setting secret name with spec
 	volumes := []corev1.Volume{
 		{
 			Name: "google-cloud-key",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: "google-cloud-key",
+					SecretName: t.Spec.SecretName,
 				},
 			},
 		},

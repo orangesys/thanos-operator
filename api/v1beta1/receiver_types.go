@@ -77,6 +77,15 @@ type ReceiverSpec struct {
 	// the receiver labels to set with receiver config
 	ReceiveLables string `json:"receiveLabels,omitempty"`
 
+	// object storage type GCS OR S3
+	ObjectStorageType string `json:"objstoreType,omitempty"`
+
+	// secret name is gcs iam secret name
+	SecretName string `json:"secretName,omitempty"`
+
+	// object storage bucket name need set object storage type
+	BucketName string `json:"bucketName,omitempty"`
+
 	// The labels to add to any time series or alerts when communicating with
 	// external systems (federation, remote storage, Alertmanager).
 	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
