@@ -1,0 +1,7 @@
+apiVersion: thanos.orangesys.io/v1beta1
+kind: Querier
+metadata:
+  name: querier-sample
+spec:
+  # Add fields here
+  foo: bar

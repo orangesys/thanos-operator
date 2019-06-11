@@ -233,7 +233,9 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 }
 
 // SetServiceFields sets fields on the Service object
+// func SetService(service *corev1.Service, t thanosv1beta1.Receiver) {
 func SetService(service *corev1.Service, t thanosv1beta1.Receiver) {
+
 	t = *t.DeepCopy()
 
 	service.Labels = map[string]string{
