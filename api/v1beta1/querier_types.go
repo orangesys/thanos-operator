@@ -40,14 +40,26 @@ type QuerierSpec struct {
 	// check own namespace.
 	ServiceMonitorNamespaceSelector *metav1.LabelSelector `json:"serviceMonitorNamespaceSelector,omitempty"`
 
+	// Define resources requests and limits for single Pods.
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
 	// Number of instances to deploy for a Prometheus deployment.
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// replicaLabel set query replica-label
+	ReplicaLabel string `json:"replicaLabel,omitempty"`
+
+	// storeDNS is storage gateway
+	StoreDNS string `json:"storeDNS,omitempty"`
 
 	// Image if specified has precedence over baseImage, tag and sha
 	// combinations. Specifying the version is still necessary to ensure the
 	// Prometheus Operator knows what version of Prometheus is being
 	// configured.
 	Image *string `json:"image,omitempty"`
+
+	// Log level for Prometheus to be configured with.
+	LogLevel string `json:"logLevel,omitempty"`
 }
 
 // QuerierStatus defines the observed state of Querier
@@ -80,11 +92,11 @@ type Querier struct {
 	Status QuerierStatus `json:"status,omitempty"`
 }
 
-// Thanos is the Schema for the thanos API
-type Thanos struct {
-	Querier  Querier
-	Receiver Receiver
-}
+// // Thanos is the Schema for the thanos API
+// type Thanos struct {
+// 	Querier  Querier
+// 	Receiver Receiver
+// }
 
 // +kubebuilder:object:root=true
 

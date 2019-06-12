@@ -24,7 +24,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 
@@ -68,9 +70,52 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	_, err := ctrl.CreateOrUpdate(ctx, r.Client, service, func() error {
-		util.SetService(service, *querier)
+		util.SetQuerierService(service, *querier)
 		return controllerutil.SetControllerReference(querier, service, r.Scheme)
 	})
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Generate Deployment
+	depl := &appsv1.Deployment{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      req.Name,
+			Namespace: req.Namespace,
+		},
+	}
+
+	_, err = ctrl.CreateOrUpdate(ctx, r.Client, depl, func() error {
+		util.SetQuerierDeployment(
+			depl,
+			service,
+			*querier,
+		)
+		return controllerutil.SetControllerReference(querier, depl, r.Scheme)
+	})
+
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Update Status
+	deplNN := req.NamespacedName
+	deplNN.Name = depl.Name
+	if err := r.Get(ctx, deplNN, depl); err != nil {
+		log.Error(err, "unable to fetch Deployment", "namespaceName", deplNN)
+		return ctrl.Result{}, err
+	}
+	querier.Status.DeploymentStatus = depl.Status
+
+	serviceNN := req.NamespacedName
+	serviceNN.Name = service.Name
+	if err := r.Get(ctx, serviceNN, service); err != nil {
+		log.Error(err, "unable to fetch Service", "namespaceName", serviceNN)
+		return ctrl.Result{}, err
+	}
+	querier.Status.ServiceStatus = service.Status
+
+	err = r.Status().Update(ctx, querier)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -81,5 +126,7 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 func (r *QuerierReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&thanosv1beta1.Querier{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
 		Complete(r)
 }

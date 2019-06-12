@@ -9,6 +9,50 @@ rules:
 - apiGroups:
   - thanos.orangesys.io
   resources:
+  - queriers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - thanos.orangesys.io
+  resources:
+  - queriers/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - deployment
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - thanos.orangesys.io
+  resources:
   - receivers
   verbs:
   - get

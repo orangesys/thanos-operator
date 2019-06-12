@@ -70,7 +70,7 @@ func (r *ReceiverReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		},
 	}
 	_, err := ctrl.CreateOrUpdate(ctx, r.Client, service, func() error {
-		util.SetService(service, *receiver)
+		util.SetReceiverService(service, *receiver)
 		return controllerutil.SetControllerReference(receiver, service, r.Scheme)
 	})
 	if err != nil {

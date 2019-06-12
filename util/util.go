@@ -49,9 +49,82 @@ var (
 	probeTimeoutSeconds int32 = 3
 )
 
+// SetQuerierDeployment set filds on a appsv1.Depployment pointer generated
+func SetQuerierDeployment(
+	dm *appsv1.Deployment,
+	service *corev1.Service,
+	t thanosv1beta1.Querier,
+) {
+	t = *t.DeepCopy()
+
+	podLabels := map[string]string{
+		"app":    "querier",
+		"thanos": t.Name,
+	}
+
+	// podAnnotations := map[string]string{}
+
+	// if t.Spec.PodMetadata != nil {
+	// 	if t.Spec.PodMetadata.Labels != nil {
+	// 		for k, v := range t.Spec.PodMetadata.Labels {
+	// 			podLabels[k] = v
+	// 		}
+	// 	}
+	// 	if t.Spec.PodMetadata.Annotations != nil {
+	// 		for k, v := range t.Spec.PodMetadata.Annotations {
+	// 			podAnnotations[k] = v
+	// 		}
+	// 	}
+	// }
+
+	dm.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: podLabels,
+	}
+	dm.Spec.Replicas = &miniReplicas
+
+	thanosArgs := []string{
+		"querier",
+		fmt.Sprintf("--query.replica-label=%s", t.Spec.ReplicaLabel),
+		fmt.Sprintf("--store=dnssrv+%s", t.Spec.StoreDNS),
+	}
+	if t.Spec.LogLevel != "" && t.Spec.LogLevel != "info" {
+		thanosArgs = append(thanosArgs, fmt.Sprintf("--log.level=%s", t.Spec.LogLevel))
+	}
+
+	ports := []corev1.ContainerPort{
+		{
+			ContainerPort: 10902,
+			Name:          "http",
+		},
+		{
+			ContainerPort: 10901,
+			Name:          "grpc",
+		},
+	}
+
+	containers := []corev1.Container{
+		{
+			Name:  "querier",
+			Image: *t.Spec.Image,
+			Args:  thanosArgs,
+			Ports: ports,
+		},
+	}
+	podspec := corev1.PodSpec{
+		TerminationGracePeriodSeconds: &gracePeriodTerm,
+		Containers:                    containers,
+	}
+
+	dm.Spec.Template = corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: dm.Spec.Selector.MatchLabels,
+		},
+		Spec: podspec,
+	}
+}
+
 // SetStatefulSetService set filds on a appsv1.StatefulSet pointer generated and
 // the Service object for the Thanos instance
-
 // SetStatefulSetFields sets fields on a appsv1.StatefulSet pointer generated for the Thanos instance
 // object: Thanos instance
 // replicas: the number of replicas for the Thanos instance
@@ -200,7 +273,7 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 
 	containers := []corev1.Container{
 		{
-			Name:         "thanos",
+			Name:         "receiver",
 			Image:        *t.Spec.Image,
 			Args:         thanosArgs,
 			Env:          env,
@@ -233,8 +306,7 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 }
 
 // SetServiceFields sets fields on the Service object
-// func SetService(service *corev1.Service, t thanosv1beta1.Receiver) {
-func SetService(service *corev1.Service, t thanosv1beta1.Receiver) {
+func SetReceiverService(service *corev1.Service, t thanosv1beta1.Receiver) {
 
 	t = *t.DeepCopy()
 
@@ -242,12 +314,33 @@ func SetService(service *corev1.Service, t thanosv1beta1.Receiver) {
 		"service": "receiver",
 		"thanos":  t.Name,
 	}
-
 	service.Spec.Ports = []corev1.ServicePort{
 		{
 			Port: 19291,
 			Name: "receive",
 		},
+		{
+			Port: 10902,
+			Name: "http",
+		},
+		{
+			Port: 10901,
+			Name: "grpc",
+		},
+	}
+	service.Spec.Selector = map[string]string{"thanos": t.Name}
+}
+
+// SetQuerierService sets fields on the Service object
+func SetQuerierService(service *corev1.Service, t thanosv1beta1.Querier) {
+
+	t = *t.DeepCopy()
+
+	service.Labels = map[string]string{
+		"service": "querier",
+		"thanos":  t.Name,
+	}
+	service.Spec.Ports = []corev1.ServicePort{
 		{
 			Port: 10902,
 			Name: "http",
