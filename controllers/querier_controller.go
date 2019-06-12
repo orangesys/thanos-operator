@@ -22,7 +22,6 @@ import (
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +31,8 @@ import (
 
 	thanosv1beta1 "github.com/orangesys/thanos-operator/api/v1beta1"
 	"github.com/orangesys/thanos-operator/util"
+
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // QuerierReconciler reconciles a Querier object
@@ -57,7 +58,7 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if ignoreNotFound(err) == nil {
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "unable to fetch thanos receiver")
+		log.Error(err, "unable to fetch thanos querier")
 		return ctrl.Result{}, err
 	}
 
@@ -68,7 +69,6 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			Namespace: req.Namespace,
 		},
 	}
-
 	_, err := ctrl.CreateOrUpdate(ctx, r.Client, service, func() error {
 		util.SetQuerierService(service, *querier)
 		return controllerutil.SetControllerReference(querier, service, r.Scheme)
@@ -78,20 +78,20 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Generate Deployment
-	depl := &appsv1.Deployment{
+	dm := &appsv1.Deployment{
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      req.Name,
 			Namespace: req.Namespace,
 		},
 	}
 
-	_, err = ctrl.CreateOrUpdate(ctx, r.Client, depl, func() error {
+	_, err = ctrl.CreateOrUpdate(ctx, r.Client, dm, func() error {
 		util.SetQuerierDeployment(
-			depl,
+			dm,
 			service,
 			*querier,
 		)
-		return controllerutil.SetControllerReference(querier, depl, r.Scheme)
+		return controllerutil.SetControllerReference(querier, dm, r.Scheme)
 	})
 
 	if err != nil {
@@ -99,21 +99,22 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Update Status
-	deplNN := req.NamespacedName
-	deplNN.Name = depl.Name
-	if err := r.Get(ctx, deplNN, depl); err != nil {
-		log.Error(err, "unable to fetch Deployment", "namespaceName", deplNN)
+	dmNN := req.NamespacedName
+	dmNN.Name = dm.Name
+	if err := r.Get(ctx, dmNN, dm); err != nil {
+		log.Error(err, "unable to fetch StatusfulSet", "namespaceName", dmNN)
 		return ctrl.Result{}, err
 	}
-	querier.Status.DeploymentStatus = depl.Status
+	querier.Status.DeploymentStatus = dm.Status
 
-	serviceNN := req.NamespacedName
-	serviceNN.Name = service.Name
-	if err := r.Get(ctx, serviceNN, service); err != nil {
-		log.Error(err, "unable to fetch Service", "namespaceName", serviceNN)
-		return ctrl.Result{}, err
-	}
-	querier.Status.ServiceStatus = service.Status
+	// serviceNN := req.NamespacedName
+	// serviceNN.Name = service.Name
+	// if err := r.Get(ctx, serviceNN, service); err != nil {
+	// 	log.Error(err, "unable to fetch Service", "namespaceName", serviceNN)
+	// 	return ctrl.Result{}, err
+	// }
+
+	// querier.Status.DeploymentStatus = service.Status
 
 	err = r.Status().Update(ctx, querier)
 	if err != nil {

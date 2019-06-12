@@ -306,13 +306,13 @@ func makePodSpec(t thanosv1beta1.Receiver) (*corev1.PodSpec, error) {
 }
 
 // SetServiceFields sets fields on the Service object
-func SetReceiverService(service *corev1.Service, t thanosv1beta1.Receiver) {
+func SetReceiverService(service *corev1.Service, r thanosv1beta1.Receiver) {
 
-	t = *t.DeepCopy()
+	r = *r.DeepCopy()
 
 	service.Labels = map[string]string{
 		"service": "receiver",
-		"thanos":  t.Name,
+		"thanos":  r.Name,
 	}
 	service.Spec.Ports = []corev1.ServicePort{
 		{
@@ -328,17 +328,17 @@ func SetReceiverService(service *corev1.Service, t thanosv1beta1.Receiver) {
 			Name: "grpc",
 		},
 	}
-	service.Spec.Selector = map[string]string{"thanos": t.Name}
+	service.Spec.Selector = map[string]string{"thanos": r.Name}
 }
 
 // SetQuerierService sets fields on the Service object
-func SetQuerierService(service *corev1.Service, t thanosv1beta1.Querier) {
+func SetQuerierService(service *corev1.Service, q thanosv1beta1.Querier) {
 
-	t = *t.DeepCopy()
+	q = *q.DeepCopy()
 
 	service.Labels = map[string]string{
 		"service": "querier",
-		"thanos":  t.Name,
+		"thanos":  q.Name,
 	}
 	service.Spec.Ports = []corev1.ServicePort{
 		{
@@ -350,5 +350,5 @@ func SetQuerierService(service *corev1.Service, t thanosv1beta1.Querier) {
 			Name: "grpc",
 		},
 	}
-	service.Spec.Selector = map[string]string{"thanos": t.Name}
+	service.Spec.Selector = map[string]string{"thanos": q.Name}
 }
