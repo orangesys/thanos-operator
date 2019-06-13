@@ -61,21 +61,36 @@ func SetQuerierDeployment(
 		"app":    "querier",
 		"thanos": t.Name,
 	}
+	if t.Spec.Resources.Requests == nil {
+		t.Spec.Resources.Requests = corev1.ResourceList{}
+	}
 
-	// podAnnotations := map[string]string{}
+	_, memoryRequestFound := t.Spec.Resources.Requests[corev1.ResourceMemory]
+	memoryLimit, memoryLimitFound := t.Spec.Resources.Limits[corev1.ResourceMemory]
+	if !memoryRequestFound {
+		defaultMemoryRequest := resource.MustParse("1Gi")
+		compareResult := memoryLimit.Cmp(defaultMemoryRequest)
+		if memoryLimitFound && compareResult <= 0 {
+			t.Spec.Resources.Requests[corev1.ResourceMemory] = memoryLimit
+		} else {
+			t.Spec.Resources.Requests[corev1.ResourceMemory] = defaultMemoryRequest
+		}
+	}
 
-	// if t.Spec.PodMetadata != nil {
-	// 	if t.Spec.PodMetadata.Labels != nil {
-	// 		for k, v := range t.Spec.PodMetadata.Labels {
-	// 			podLabels[k] = v
-	// 		}
-	// 	}
-	// 	if t.Spec.PodMetadata.Annotations != nil {
-	// 		for k, v := range t.Spec.PodMetadata.Annotations {
-	// 			podAnnotations[k] = v
-	// 		}
-	// 	}
-	// }
+	podAnnotations := map[string]string{}
+
+	if t.Spec.PodMetadata != nil {
+		if t.Spec.PodMetadata.Labels != nil {
+			for k, v := range t.Spec.PodMetadata.Labels {
+				podLabels[k] = v
+			}
+		}
+		if t.Spec.PodMetadata.Annotations != nil {
+			for k, v := range t.Spec.PodMetadata.Annotations {
+				podAnnotations[k] = v
+			}
+		}
+	}
 
 	dm.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: podLabels,
@@ -83,9 +98,9 @@ func SetQuerierDeployment(
 	dm.Spec.Replicas = &miniReplicas
 
 	thanosArgs := []string{
-		"querier",
+		"query",
 		fmt.Sprintf("--query.replica-label=%s", t.Spec.ReplicaLabel),
-		fmt.Sprintf("--store=dnssrv+%s", t.Spec.StoreDNS),
+		// fmt.Sprintf("--store=dnssrv+%s", t.Spec.StoreDNS),
 	}
 	if t.Spec.LogLevel != "" && t.Spec.LogLevel != "info" {
 		thanosArgs = append(thanosArgs, fmt.Sprintf("--log.level=%s", t.Spec.LogLevel))

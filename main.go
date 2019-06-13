@@ -38,10 +38,11 @@ var (
 )
 
 func init() {
-
-	thanosv1beta1.AddToScheme(scheme)
 	appsv1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
+
+	thanosv1beta1.AddToScheme(scheme)
+	thanosv1beta1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -69,8 +70,10 @@ func main() {
 		os.Exit(1)
 	}
 	err = (&controllers.QuerierReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Querier"),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("Querier"),
+		Recorder: mgr.GetEventRecorderFor("querier"),
+		Scheme:   mgr.GetScheme(),
 	}).SetupWithManager(mgr)
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Querier")

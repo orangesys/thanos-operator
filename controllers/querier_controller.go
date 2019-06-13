@@ -107,14 +107,14 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 	querier.Status.DeploymentStatus = dm.Status
 
-	// serviceNN := req.NamespacedName
-	// serviceNN.Name = service.Name
-	// if err := r.Get(ctx, serviceNN, service); err != nil {
-	// 	log.Error(err, "unable to fetch Service", "namespaceName", serviceNN)
-	// 	return ctrl.Result{}, err
-	// }
+	serviceNN := req.NamespacedName
+	serviceNN.Name = service.Name
+	if err := r.Get(ctx, serviceNN, service); err != nil {
+		log.Error(err, "unable to fetch Service", "namespaceName", serviceNN)
+		return ctrl.Result{}, err
+	}
 
-	// querier.Status.DeploymentStatus = service.Status
+	querier.Status.ServiceStatus = service.Status
 
 	err = r.Status().Update(ctx, querier)
 	if err != nil {
