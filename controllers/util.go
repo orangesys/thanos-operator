@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -9,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	thanosv1beta1 "github.com/orangesys/thanos-operator/api/v1beta1"
 )
@@ -223,12 +225,27 @@ func setQuerierDeployment(
 		},
 	}
 
+	// var livenessProbeHandler corev1.Handler
+	livenessProbeHandler := corev1.Handler{
+		HTTPGet: &corev1.HTTPGetAction{
+			Path: path.Clean("/-/healthy"),
+			Port: intstr.FromString("http"),
+		},
+	}
+	// var livenessProbe *corev1.Probe
+	livenessProbe := &corev1.Probe{
+		Handler:          livenessProbeHandler,
+		PeriodSeconds:    5,
+		FailureThreshold: 120,
+	}
+
 	containers := []corev1.Container{
 		{
-			Name:  "querier",
-			Image: *t.Spec.Image,
-			Args:  thanosArgs,
-			Ports: ports,
+			Name:          "querier",
+			Image:         *t.Spec.Image,
+			Args:          thanosArgs,
+			LivenessProbe: livenessProbe,
+			Ports:         ports,
 		},
 	}
 	podspec := corev1.PodSpec{
