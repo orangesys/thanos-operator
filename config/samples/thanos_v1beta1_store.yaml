@@ -1,0 +1,12 @@
+apiVersion: thanos.orangesys.io/v1beta1
+kind: Store
+metadata:
+  name: store-sample
+spec:
+  image: "improbable/thanos:v0.5.0"
+  dataDir: "/thanos-data"
+  indexCacheSize: "500MB"
+  chunkPoolSize: "500MB"
+  bucketName: "orangesys-thanos-demo"
+  objstoreType: "GCS"
+  secretName: "thanos-demo-gcs"

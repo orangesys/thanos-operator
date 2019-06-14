@@ -35,7 +35,127 @@ var (
 	probeTimeoutSeconds int32 = 3
 )
 
-// SetQuerierDeployment set filds on a appsv1.Depployment pointer generated
+// setStoreDeployment set fields on appsv1.Depployment pointer generated
+func setStoreDeployment(
+	dm *appsv1.Deployment,
+	service *corev1.Service,
+	t thanosv1beta1.Store,
+) {
+	t = *t.DeepCopy()
+
+	podLabels := map[string]string{
+		"app":    "store",
+		"thanos": t.Name,
+	}
+	if t.Spec.Resources.Requests == nil {
+		t.Spec.Resources.Requests = corev1.ResourceList{}
+	}
+
+	_, memoryRequestFound := t.Spec.Resources.Requests[corev1.ResourceMemory]
+	memoryLimit, memoryLimitFound := t.Spec.Resources.Limits[corev1.ResourceMemory]
+	if !memoryRequestFound {
+		defaultMemoryRequest := resource.MustParse("1Gi")
+		compareResult := memoryLimit.Cmp(defaultMemoryRequest)
+		if memoryLimitFound && compareResult <= 0 {
+			t.Spec.Resources.Requests[corev1.ResourceMemory] = memoryLimit
+		} else {
+			t.Spec.Resources.Requests[corev1.ResourceMemory] = defaultMemoryRequest
+		}
+	}
+
+	podAnnotations := map[string]string{}
+
+	if t.Spec.PodMetadata != nil {
+		if t.Spec.PodMetadata.Labels != nil {
+			for k, v := range t.Spec.PodMetadata.Labels {
+				podLabels[k] = v
+			}
+		}
+		if t.Spec.PodMetadata.Annotations != nil {
+			for k, v := range t.Spec.PodMetadata.Annotations {
+				podAnnotations[k] = v
+			}
+		}
+	}
+
+	dm.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: podLabels,
+	}
+	dm.Spec.Replicas = &miniReplicas
+
+	thanosArgs := []string{
+		"store",
+		fmt.Sprintf("--index-cache-size=%s", t.Spec.IndexCacheSize),
+		fmt.Sprintf("--chunk-pool-size=%s", t.Spec.ChunkPoolSize),
+		fmt.Sprintf("--data-dir=%s", t.Spec.DataDir),
+		fmt.Sprintf("--objstore.config=type: %s\nconfig:\n  bucket: \"%s\"", t.Spec.ObjectStorageType, t.Spec.BucketName),
+	}
+	if t.Spec.LogLevel != "" && t.Spec.LogLevel != "info" {
+		thanosArgs = append(thanosArgs, fmt.Sprintf("--log.level=%s", t.Spec.LogLevel))
+	}
+
+	env := []corev1.EnvVar{
+		{
+			Name:  "GOOGLE_APPLICATION_CREDENTIALS",
+			Value: secretsDir + t.Spec.SecretName + ".json",
+		},
+	}
+
+	ports := []corev1.ContainerPort{
+		{
+			ContainerPort: 10902,
+			Name:          "http",
+		},
+		{
+			ContainerPort: 10901,
+			Name:          "grpc",
+		},
+	}
+
+	// mount to pod
+	volumemounts := []corev1.VolumeMount{
+		{
+			Name:      "google-cloud-key",
+			MountPath: secretsDir,
+		},
+	}
+
+	containers := []corev1.Container{
+		{
+			Name:         "store",
+			Image:        *t.Spec.Image,
+			Args:         thanosArgs,
+			Env:          env,
+			Ports:        ports,
+			VolumeMounts: volumemounts,
+		},
+	}
+	volumes := []corev1.Volume{
+		{
+			Name: "google-cloud-key",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: t.Spec.SecretName,
+				},
+			},
+		},
+	}
+
+	podspec := corev1.PodSpec{
+		TerminationGracePeriodSeconds: &gracePeriodTerm,
+		Containers:                    containers,
+		Volumes:                       volumes,
+	}
+
+	dm.Spec.Template = corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: dm.Spec.Selector.MatchLabels,
+		},
+		Spec: podspec,
+	}
+}
+
+// setQuerierDeployment set fields on a appsv1.Depployment pointer generated
 func setQuerierDeployment(
 	dm *appsv1.Deployment,
 	service *corev1.Service,
@@ -330,6 +450,22 @@ func makeService(service *corev1.Service, role string) {
 	if strings.Contains(role, "querier") {
 		service.Labels = map[string]string{
 			"service": "querier",
+			"thanos":  role,
+		}
+		service.Spec.Ports = []corev1.ServicePort{
+			{
+				Port: 10902,
+				Name: "http",
+			},
+			{
+				Port: 10901,
+				Name: "grpc",
+			},
+		}
+	}
+	if strings.Contains(role, "store") {
+		service.Labels = map[string]string{
+			"service": "store",
 			"thanos":  role,
 		}
 		service.Spec.Ports = []corev1.ServicePort{

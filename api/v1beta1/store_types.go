@@ -25,8 +25,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ReceiverSpec defines the desired state of Receiver
-type ReceiverSpec struct {
+// StoreSpec defines the desired state of Store
+type StoreSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -40,42 +40,8 @@ type ReceiverSpec struct {
 	// check own namespace.
 	ServiceMonitorNamespaceSelector *metav1.LabelSelector `json:"serviceMonitorNamespaceSelector,omitempty"`
 
-	// Number of instances to deploy for a Prometheus deployment.
-	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Version of Prometheus to be deployed.
-	Version string `json:"version,omitempty"`
-	// Tag of Prometheus container image to be deployed. Defaults to the value of `version`.
-	// Version is ignored if Tag is set.
-	Tag string `json:"tag,omitempty"`
-
-	// If specified, the pod's scheduling constraints.
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Image if specified has precedence over baseImage, tag and sha
-	// combinations. Specifying the version is still necessary to ensure the
-	// Prometheus Operator knows what version of Prometheus is being
-	// configured.
-	Image *string `json:"image,omitempty"`
-	// Base image to use for a Prometheus deployment.
-
-	BaseImage string `json:"baseImage,omitempty"`
-
 	// Define resources requests and limits for single Pods.
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// Time duration Prometheus shall retain data for. Default is '24h',
-	// and must match the regular expression `[0-9]+(ms|s|m|h|d|w|y)` (milliseconds seconds minutes hours days weeks years).
-	Retention string `json:"retention,omitempty"`
-
-	// The recieve prefix storage with tsdb
-	ReceivePrefix string `json:"receivePrefix,omitempty"`
-
-	// Log level for Prometheus to be configured with.
-	LogLevel string `json:"logLevel,omitempty"`
-
-	// the receiver labels to set with receiver config
-	ReceiveLables string `json:"receiveLabels,omitempty"`
 
 	// object storage type GCS OR S3
 	ObjectStorageType string `json:"objstoreType,omitempty"`
@@ -85,13 +51,6 @@ type ReceiverSpec struct {
 
 	// object storage bucket name need set object storage type
 	BucketName string `json:"bucketName,omitempty"`
-
-	// The labels to add to any time series or alerts when communicating with
-	// external systems (federation, remote storage, Alertmanager).
-	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
-
-	// Storage spec to specify how storage shall be used.
-	Storage string `json:"storage,omitempty"`
 
 	// Define which Nodes the Pods are scheduled on.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
@@ -107,15 +66,32 @@ type ReceiverSpec struct {
 
 	// ObjectStorageConfig configures object storage in Thanos.
 	ObjectStorageConfig *corev1.SecretKeySelector `json:"objectStorageConfig,omitempty"`
+
+	// DataDir is cache from objectstorage
+	DataDir string `json:"dataDir,omitempty"`
+
+	// IndexCacheSize is index cache size with store
+	IndexCacheSize string `json:"indexCacheSize,omitempty"`
+
+	// ChunkPoolSize is chunk pool size with store
+	ChunkPoolSize string `json:"chunkPoolSize,omitempty"`
+
+	// Image if specified has precedence over baseImage, tag and sha
+	// combinations. Specifying the version is still necessary to ensure the
+	// Prometheus Operator knows what version of Prometheus is being
+	// configured.
+	Image *string `json:"image,omitempty"`
+
+	// Log level for Prometheus to be configured with.
+	LogLevel string `json:"logLevel,omitempty"`
 }
 
-// ReceiverStatus defines the observed state of Receiver
-type ReceiverStatus struct {
+// StoreStatus defines the observed state of Store
+type StoreStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-
-	// statefulSetStatus contains the status of the StatefulSet managed by Thanos
-	StatefulSetStatus appsv1.StatefulSetStatus `json:"statefulSetStatus,omitempty"`
+	// deploymentStatus contains the status of the deployment managed by Thanos
+	DeploymentStatus appsv1.DeploymentStatus `json:"deploymentStatus,omitempty"`
 
 	// serviceStatus contains the status of the Service managed by thanos reciver
 	ServiceStatus corev1.ServiceStatus `json:"serviceStatus,omitempty"`
@@ -131,31 +107,31 @@ type ReceiverStatus struct {
 }
 
 // +kubebuilder:printcolumn:name="storage",type="string",JSONPath=".spec.storage",format="byte"
-// +kubebuilder:printcolumn:name="ready replicas",type="integer",JSONPath=".status.statefulSetStatus.readyReplicas",format="int32"
-// +kubebuilder:printcolumn:name="current replicas",type="integer",JSONPath=".status.statefulSetStatus.currentReplicas",format="int32"
+// +kubebuilder:printcolumn:name="ready replicas",type="integer",JSONPath=".status.Deployment.readyReplicas",format="int32"
+// +kubebuilder:printcolumn:name="current replicas",type="integer",JSONPath=".status.Deployment.currentReplicas",format="int32"
 
 // +kubebuilder:object:root=true
-// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.statefulSetStatus.replicas
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.Deployment.replicas
 // +kubebuilder:subresource:status
 
-// Receiver is the Schema for the receivers API
-type Receiver struct {
+// Store is the Schema for the stores API
+type Store struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ReceiverSpec   `json:"spec,omitempty"`
-	Status ReceiverStatus `json:"status,omitempty"`
+	Spec   StoreSpec   `json:"spec,omitempty"`
+	Status StoreStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ReceiverList contains a list of Receiver
-type ReceiverList struct {
+// StoreList contains a list of Store
+type StoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Receiver `json:"items"`
+	Items           []Store `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Receiver{}, &ReceiverList{})
+	SchemeBuilder.Register(&Store{}, &StoreList{})
 }
