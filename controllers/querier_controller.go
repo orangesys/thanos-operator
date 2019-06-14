@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	thanosv1beta1 "github.com/orangesys/thanos-operator/api/v1beta1"
-	"github.com/orangesys/thanos-operator/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -70,7 +69,7 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		},
 	}
 	_, err := ctrl.CreateOrUpdate(ctx, r.Client, service, func() error {
-		util.SetQuerierService(service, *querier)
+		makeService(service, service.Name)
 		return controllerutil.SetControllerReference(querier, service, r.Scheme)
 	})
 	if err != nil {
@@ -86,7 +85,7 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	_, err = ctrl.CreateOrUpdate(ctx, r.Client, dm, func() error {
-		util.SetQuerierDeployment(
+		setQuerierDeployment(
 			dm,
 			service,
 			*querier,

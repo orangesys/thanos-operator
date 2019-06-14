@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	thanosv1beta1 "github.com/orangesys/thanos-operator/api/v1beta1"
-	"github.com/orangesys/thanos-operator/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -70,7 +69,8 @@ func (r *ReceiverReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		},
 	}
 	_, err := ctrl.CreateOrUpdate(ctx, r.Client, service, func() error {
-		util.SetReceiverService(service, *receiver)
+		// util.SetReceiverService(service, *receiver)
+		makeService(service, receiver.Name)
 		return controllerutil.SetControllerReference(receiver, service, r.Scheme)
 	})
 	if err != nil {
@@ -86,7 +86,7 @@ func (r *ReceiverReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	_, err = ctrl.CreateOrUpdate(ctx, r.Client, ss, func() error {
-		util.SetStatefulSet(
+		setReceiverStatefulSet(
 			ss,
 			service,
 			*receiver,
