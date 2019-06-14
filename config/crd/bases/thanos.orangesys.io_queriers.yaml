@@ -11,6 +11,11 @@ spec:
     kind: Querier
     plural: queriers
   scope: ""
+  subresources:
+    scale:
+      specReplicasPath: .spec.replicas
+      statusReplicasPath: .status.Deployment.replicas
+    status: {}
   validation:
     openAPIV3Schema:
       description: Querier is the Schema for the queriers API

@@ -81,7 +81,13 @@ type QuerierStatus struct {
 	UnavailableReplicas int32 `json:"unavailableReplicas"`
 }
 
+// +kubebuilder:printcolumn:name="storage",type="string",JSONPath=".spec.storage",format="byte"
+// +kubebuilder:printcolumn:name="ready replicas",type="integer",JSONPath=".status.Deployment.readyReplicas",format="int32"
+// +kubebuilder:printcolumn:name="current replicas",type="integer",JSONPath=".status.Deployment.currentReplicas",format="int32"
+
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.Deployment.replicas
+// +kubebuilder:subresource:status
 
 // Querier is the Schema for the queriers API
 type Querier struct {
@@ -91,12 +97,6 @@ type Querier struct {
 	Spec   QuerierSpec   `json:"spec,omitempty"`
 	Status QuerierStatus `json:"status,omitempty"`
 }
-
-// // Thanos is the Schema for the thanos API
-// type Thanos struct {
-// 	Querier  Querier
-// 	Receiver Receiver
-// }
 
 // +kubebuilder:object:root=true
 
