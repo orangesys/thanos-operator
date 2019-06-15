@@ -1,7 +1,7 @@
 TAG := $(shell git log -1 --pretty=%h)
 
 # Image URL to use all building/pushing image targets
-IMG ?= orangesys/alpine-grafana:$(TAG)
+IMG ?= orangesys/thanos-operator:$(TAG)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
