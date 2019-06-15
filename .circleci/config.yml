@@ -21,6 +21,14 @@ jobs:
           key: go-mod-v1-{{ checksum "go.sum" }}
           paths:
             - "go/pkg/mod"
+      - run:
+          name: Install kubebuilder
+          command: |
+            export os=$(go env GOOS)
+            export arch=$(go env GOARCH)
+            curl -sL https://go.kubebuilder.io/dl/2.0.0-alpha.4/${os}/${arch} | tar -xz -C /tmp/
+            sudo mv /tmp/kubebuilder_2.0.0-alpha.4_${os}_${arch} /usr/local/kubebuilder
+            export PATH=$PATH:/usr/local/kubebuilder/bin >> ~/.BASH_ENV
       - run: make docker-build
       
           
