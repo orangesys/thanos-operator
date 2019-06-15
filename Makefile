@@ -1,4 +1,4 @@
-TAG := $(shell git log -1 --pretty=%H)
+TAG := $(shell git log -1 --pretty=%h)
 
 # Image URL to use all building/pushing image targets
 IMG ?= orangesys/alpine-grafana:$(TAG)
