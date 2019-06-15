@@ -4,8 +4,6 @@ default: &default
   working_directory: /go/src/github.com/orangesys/thanos-operator
   environment:
     GO111MODULE: "on"
-    GOPATH: /go
-    GOCACHE: /.cache/go-build
 
 version: 2
 
