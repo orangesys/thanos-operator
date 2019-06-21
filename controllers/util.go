@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	thanosv1beta1 "github.com/orangesys/thanos-operator/api/v1beta1"
@@ -36,6 +37,30 @@ var (
 
 	probeTimeoutSeconds int32 = 3
 )
+
+func setCondition(conds *[]thanosv1beta1.StatusCondition, targetCond thanosv1beta1.StatusCondition) {
+	var outCond *thanosv1beta1.StatusCondition
+	for i, cond := range *conds {
+		if cond.Type == targetCond.Type {
+			outCond = &(*conds)[i]
+			break
+		}
+	}
+	if outCond == nil {
+		*conds = append(*conds, targetCond)
+		outCond = &(*conds)[len(*conds)-1]
+	} else {
+		lastState := outCond.Status
+		lastTrans := outCond.LastTransitionTime
+		*outCond = targetCond
+		if outCond.Status != lastState {
+			outCond.LastTransitionTime = metav1.Now()
+		} else {
+			outCond.LastProbeTime = lastTrans
+		}
+	}
+	outCond.LastProbeTime = metav1.Now()
+}
 
 // setStoreDeployment set fields on appsv1.Depployment pointer generated
 func setStoreDeployment(
@@ -160,7 +185,6 @@ func setStoreDeployment(
 // setQuerierDeployment set fields on a appsv1.Depployment pointer generated
 func setQuerierDeployment(
 	dm *appsv1.Deployment,
-	service *corev1.Service,
 	t thanosv1beta1.Querier,
 ) {
 	t = *t.DeepCopy()
@@ -504,4 +528,11 @@ func ignoreNotFound(err error) error {
 		return nil
 	}
 	return err
+}
+
+func ownedByOther(obj metav1.Object, apiVersion schema.GroupVersion, kind, name string) *metav1.OwnerReference {
+	if ownerRef := metav1.GetControllerOf(obj); ownerRef != nil && (ownerRef.Name != name || ownerRef.Kind != kind || ownerRef.APIVersion != apiVersion.String()) {
+		return ownerRef
+	}
+	return nil
 }

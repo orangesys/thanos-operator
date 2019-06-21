@@ -6,6 +6,15 @@ metadata:
   creationTimestamp: null
   name: queriers.thanos.orangesys.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type=="DeploymentUpToDate")].status
+    description: Is the Deployment Up-To-Date
+    name: Deployment
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="ServiceUpToDate")].status
+    description: Is the Service Up-To-Date
+    name: Service
+    type: string
   group: thanos.orangesys.io
   names:
     kind: Querier
@@ -884,127 +893,28 @@ spec:
           type: object
         status:
           properties:
-            availableReplicas:
-              description: Total number of available pods (ready for at least minReadySeconds)
-                targeted by this Prometheus deployment.
-              format: int32
-              type: integer
-            deploymentStatus:
-              description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                of cluster Important: Run "make" to regenerate code after modifying
-                this file'
-              properties:
-                availableReplicas:
-                  description: Total number of available pods (ready for at least
-                    minReadySeconds) targeted by this deployment.
-                  format: int32
-                  type: integer
-                collisionCount:
-                  description: Count of hash collisions for the Deployment. The Deployment
-                    controller uses this field as a collision avoidance mechanism
-                    when it needs to create the name for the newest ReplicaSet.
-                  format: int32
-                  type: integer
-                conditions:
-                  description: Represents the latest available observations of a deployment's
-                    current state.
-                  items:
-                    properties:
-                      lastTransitionTime:
-                        description: Last time the condition transitioned from one
-                          status to another.
-                        format: date-time
-                        type: string
-                      lastUpdateTime:
-                        description: The last time this condition was updated.
-                        format: date-time
-                        type: string
-                      message:
-                        description: A human readable message indicating details about
-                          the transition.
-                        type: string
-                      reason:
-                        description: The reason for the condition's last transition.
-                        type: string
-                      status:
-                        description: Status of the condition, one of True, False,
-                          Unknown.
-                        type: string
-                      type:
-                        description: Type of deployment condition.
-                        type: string
-                    required:
-                    - type
-                    - status
-                    type: object
-                  type: array
-                observedGeneration:
-                  description: The generation observed by the deployment controller.
-                  format: int64
-                  type: integer
-                readyReplicas:
-                  description: Total number of ready pods targeted by this deployment.
-                  format: int32
-                  type: integer
-                replicas:
-                  description: Total number of non-terminated pods targeted by this
-                    deployment (their labels match the selector).
-                  format: int32
-                  type: integer
-                unavailableReplicas:
-                  description: Total number of unavailable pods targeted by this deployment.
-                    This is the total number of pods that are still required for the
-                    deployment to have 100% available capacity. They may either be
-                    pods that are running but not yet available or pods that still
-                    have not been created.
-                  format: int32
-                  type: integer
-                updatedReplicas:
-                  description: Total number of non-terminated pods targeted by this
-                    deployment that have the desired template spec.
-                  format: int32
-                  type: integer
-              type: object
-            serviceStatus:
-              description: serviceStatus contains the status of the Service managed
-                by thanos reciver
-              properties:
-                loadBalancer:
-                  description: LoadBalancer contains the current status of the load-balancer,
-                    if one is present.
-                  properties:
-                    ingress:
-                      description: Ingress is a list containing ingress points for
-                        the load-balancer. Traffic intended for the service should
-                        be sent to these ingress points.
-                      items:
-                        properties:
-                          hostname:
-                            description: Hostname is set for load-balancer ingress
-                              points that are DNS based (typically AWS load-balancers)
-                            type: string
-                          ip:
-                            description: IP is set for load-balancer ingress points
-                              that are IP based (typically GCE or OpenStack load-balancers)
-                            type: string
-                        type: object
-                      type: array
-                  type: object
-              type: object
-            unavailableReplicas:
-              description: Total number of unavailable pods targeted by this Prometheus
-                deployment.
-              format: int32
-              type: integer
-            updatedReplicas:
-              description: Total number of non-terminated pods targeted by this Prometheus
-                deployment that have the desired version spec.
-              format: int32
-              type: integer
-          required:
-          - updatedReplicas
-          - availableReplicas
-          - unavailableReplicas
+            conditions:
+              items:
+                properties:
+                  lastProbeTime:
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    format: date-time
+                    type: string
+                  message:
+                    type: string
+                  reason:
+                    type: string
+                  status:
+                    type: string
+                  type:
+                    type: string
+                required:
+                - type
+                - status
+                type: object
+              type: array
           type: object
       type: object
   versions:

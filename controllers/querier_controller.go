@@ -30,8 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	thanosv1beta1 "github.com/orangesys/thanos-operator/api/v1beta1"
-
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // QuerierReconciler reconciles a Querier object
@@ -68,11 +66,39 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			Namespace: req.Namespace,
 		},
 	}
-	_, err := ctrl.CreateOrUpdate(ctx, r.Client, service, func() error {
+	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, service, func() error {
+		if ownerRef := ownedByOther(service, thanosv1beta1.GroupVersion, "Querier", req.Name); ownerRef != nil {
+			log.Info("cowardly refusing to take ownership of somebody else's service", "owner", ownerRef)
+			setCondition(&querier.Status.Conditions, thanosv1beta1.StatusCondition{
+				Type:    "ServiceUpToDate",
+				Status:  thanosv1beta1.ConditionStatusUnhealthy,
+				Reason:  "OrphanService",
+				Message: "Refusing to take ownership of somebody else's service",
+			})
+			return nil
+		}
 		makeService(service, service.Name)
-		return controllerutil.SetControllerReference(querier, service, r.Scheme)
-	})
-	if err != nil {
+		if err := ctrl.SetControllerReference(querier, service, r.Scheme); err != nil {
+			return err
+		}
+		setCondition(&querier.Status.Conditions, thanosv1beta1.StatusCondition{
+			Type:    "ServiceUpToDate",
+			Status:  thanosv1beta1.ConditionStatusHealthy,
+			Reason:  "EnsuredService",
+			Message: "Ensured service was up to date",
+		})
+		return nil
+	}); err != nil {
+		log.Error(err, "unable to ensure service is correct")
+		setCondition(&querier.Status.Conditions, thanosv1beta1.StatusCondition{
+			Type:    "ServiceUpToDate",
+			Status:  thanosv1beta1.ConditionStatusUnhealthy,
+			Reason:  "UpdateError",
+			Message: "Unable to fetch or update service",
+		})
+		if err := r.Status().Update(ctx, querier); err != nil {
+			log.Error(err, "unable to update querier status")
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -84,42 +110,36 @@ func (r *QuerierReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		},
 	}
 
-	_, err = ctrl.CreateOrUpdate(ctx, r.Client, dm, func() error {
+	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, dm, func() error {
 		setQuerierDeployment(
 			dm,
-			service,
 			*querier,
 		)
-		return controllerutil.SetControllerReference(querier, dm, r.Scheme)
-	})
 
-	if err != nil {
+		if err := ctrl.SetControllerReference(querier, dm, r.Scheme); err != nil {
+			return err
+		}
+
+		setCondition(&querier.Status.Conditions, thanosv1beta1.StatusCondition{
+			Type:    "DeploymentUpToDate",
+			Status:  thanosv1beta1.ConditionStatusHealthy,
+			Reason:  "EnsuredDeployment",
+			Message: "Ensured deployment was up to date",
+		})
+		return nil
+	}); err != nil {
+		log.Error(err, "unable to ensure deployment is correct")
+		setCondition(&querier.Status.Conditions, thanosv1beta1.StatusCondition{
+			Type:    "DeploymentUpToDate",
+			Status:  thanosv1beta1.ConditionStatusUnhealthy,
+			Reason:  "UpdateError",
+			Message: "Unable to fetch or update deployment",
+		})
+		if err := r.Status().Update(ctx, querier); err != nil {
+			log.Error(err, "unable to update querier status")
+		}
 		return ctrl.Result{}, err
 	}
-
-	// Update Status
-	dmNN := req.NamespacedName
-	dmNN.Name = dm.Name
-	if err := r.Get(ctx, dmNN, dm); err != nil {
-		log.Error(err, "unable to fetch StatusfulSet", "namespaceName", dmNN)
-		return ctrl.Result{}, err
-	}
-	querier.Status.DeploymentStatus = dm.Status
-
-	serviceNN := req.NamespacedName
-	serviceNN.Name = service.Name
-	if err := r.Get(ctx, serviceNN, service); err != nil {
-		log.Error(err, "unable to fetch Service", "namespaceName", serviceNN)
-		return ctrl.Result{}, err
-	}
-
-	querier.Status.ServiceStatus = service.Status
-
-	err = r.Status().Update(ctx, querier)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
 	return ctrl.Result{}, nil
 }
 

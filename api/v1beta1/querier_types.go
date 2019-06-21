@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -66,19 +65,42 @@ type QuerierSpec struct {
 type QuerierStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	DeploymentStatus appsv1.DeploymentStatus `json:"deploymentStatus,omitempty"`
+	// DeploymentStatus appsv1.DeploymentStatus `json:"deploymentStatus,omitempty"`
 
 	// serviceStatus contains the status of the Service managed by thanos reciver
-	ServiceStatus corev1.ServiceStatus `json:"serviceStatus,omitempty"`
+	// ServiceStatus corev1.ServiceStatus `json:"serviceStatus,omitempty"`
 
 	// Total number of non-terminated pods targeted by this Prometheus deployment
 	// that have the desired version spec.
-	UpdatedReplicas int32 `json:"updatedReplicas"`
+	// UpdatedReplicas int32 `json:"updatedReplicas"`
 	// Total number of available pods (ready for at least minReadySeconds)
 	// targeted by this Prometheus deployment.
-	AvailableReplicas int32 `json:"availableReplicas"`
+	// AvailableReplicas int32 `json:"availableReplicas"`
 	// Total number of unavailable pods targeted by this Prometheus deployment.
-	UnavailableReplicas int32 `json:"unavailableReplicas"`
+	// UnavailableReplicas int32 `json:"unavailableReplicas"`
+
+	Conditions []StatusCondition `json:"conditions,omitempty"`
+}
+
+type ConditionStatus string
+
+var (
+	ConditionStatusHealthy   ConditionStatus = "Healthy"
+	ConditionStatusUnhealthy ConditionStatus = "Unhealthy"
+	ConditionStatusUnknown   ConditionStatus = "Unknown"
+)
+
+type StatusCondition struct {
+	Type   string          `json:"type"`
+	Status ConditionStatus `json:"status"`
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // +kubebuilder:printcolumn:name="storage",type="string",JSONPath=".spec.storage",format="byte"
@@ -88,6 +110,8 @@ type QuerierStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.Deployment.replicas
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:priority=0,name=Deployment,type=string,JSONPath=".status.conditions[?(@.type==\"DeploymentUpToDate\")].status",description="Is the Deployment Up-To-Date",format=""
+// +kubebuilder:printcolumn:priority=0,name=Service,type=string,JSONPath=".status.conditions[?(@.type==\"ServiceUpToDate\")].status",description="Is the Service Up-To-Date",format=""
 
 // Querier is the Schema for the queriers API
 type Querier struct {
