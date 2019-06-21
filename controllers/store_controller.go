@@ -84,7 +84,6 @@ func (r *StoreReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_, err = ctrl.CreateOrUpdate(ctx, r.Client, dm, func() error {
 		setStoreDeployment(
 			dm,
-			service,
 			*store,
 		)
 		return controllerutil.SetControllerReference(store, dm, r.Scheme)

@@ -65,7 +65,6 @@ func setCondition(conds *[]thanosv1beta1.StatusCondition, targetCond thanosv1bet
 // setStoreDeployment set fields on appsv1.Depployment pointer generated
 func setStoreDeployment(
 	dm *appsv1.Deployment,
-	service *corev1.Service,
 	t thanosv1beta1.Store,
 ) {
 	t = *t.DeepCopy()
